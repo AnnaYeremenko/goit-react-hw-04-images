@@ -1,16 +1,111 @@
+import { useState, useEffect, useRef} from 'react';
+import { ToastContainer, toast} from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { fetchGalleryWithQuery } from './Api/Api';
+import { Button } from './Button/Button';
+import { ImageGallery } from './ImageGallery/ImageGallery';
+import { Loader } from './Loader/Loader';
+import { Modal } from './Modal/Modal';
+import { Searchbar } from './Searchbar/Searchbar';
+
 export const App = () => {
-  return (
-    <div
-      style={{
-        height: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        fontSize: 40,
-        color: '#010101'
-      }}
-    >
-      React homework template
-    </div>
-  );
-};
+    const [page, setPage] = useState(1);
+    const [query, setQuery] = useState('');
+    const [images, setImages] = useState([]);
+    // const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState('');
+    const [total, setTotal] = useState(null);
+    // const [loadPage, setLoadPage] = useState(false);
+
+    const isFirstRender = useRef(true);
+
+    const handleSubmit = evt => {
+      evt.preventDefault();
+      setPage(1);
+      setQuery(evt.target.elements.query.value);
+      setImages([]);
+    };
+
+    useEffect(() => {
+      if (isFirstRender.current) {
+        isFirstRender.current = false;
+        return;
+      }
+      async function getImage() {
+        if (query === '') {
+          return;
+        }
+        setIsLoading(true);
+      try {
+        const response = await fetchGalleryWithQuery(query, page);
+        setImages(prevImages => [...prevImages, ...response.hits]);
+        setTotal(prevTotal => response.totalHits);
+      } catch (error) {
+        toast(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    getImage();
+  }, [query, page]);
+
+  useEffect(() => {
+    if (page > 1)
+    window.scrollTo({
+      top: 300,
+      behavior: 'smooth',
+    });
+  });
+
+  const hendleLoadMore = () => {
+    setPage(prevPage => prevPage +1);
+  };
+
+  const selectImage = imageUrl => {
+    setSelectedImage(imageUrl);
+    setIsOpen(true);
+    };
+
+  const modalClose = () => {
+    setSelectedImage('');
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (event.code === 'Escape') {
+        modalClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+  
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gridGap: '16px',
+          paddingBottom: '24px',
+        }}
+      >
+        <Searchbar onSubmit={handleSubmit} />
+        {isLoading ? (
+          <Loader />
+        ) : (
+          <ImageGallery
+            images={images}
+            onSelect={selectImage}
+          />
+        )}
+        {isOpen && <Modal src={selectedImage} onClose={modalClose} />}
+        {images.length < total && <Button onClick={hendleLoadMore} />}
+        <ToastContainer />
+      </div>
+    );
+  };
